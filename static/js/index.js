@@ -1,803 +1,115 @@
-/* ------------------------------------------------------------------
-   AFFORD-X project page.
+/* Project page kit: nav, sortable tables, heat tables, segmented controls, lightbox, BibTeX copy. */
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
-   Every measured value comes from static/js/affordx_data.js (window.AFFORDX),
-   which AFFORD-X/scripts/figures/export_project_page.py writes from finalized
-   run directories. Nothing numeric is typed in this file.
-   ------------------------------------------------------------------ */
-
-function copyBibTeX() {
-  var bibtexElement = document.getElementById('bibtex-code');
-  var button = document.querySelector('.copy-bibtex-btn');
-  if (!bibtexElement || !button) return;
-  var copyText = button.querySelector('.copy-text');
-
-  function markCopied() {
-    button.classList.add('copied');
-    if (copyText) copyText.textContent = 'Copied!';
-    setTimeout(function () {
-      button.classList.remove('copied');
-      if (copyText) copyText.textContent = 'Copy';
-    }, 2000);
-  }
-
-  function fallbackCopy() {
-    var textArea = document.createElement('textarea');
-    textArea.value = bibtexElement.textContent;
-    document.body.appendChild(textArea);
-    textArea.select();
-    try { document.execCommand('copy'); } catch (e) { /* nothing else to try */ }
-    document.body.removeChild(textArea);
-    markCopied();
-  }
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(bibtexElement.textContent).then(markCopied).catch(fallbackCopy);
-  } else {
-    fallbackCopy();
-  }
-}
-
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function onFirstView(element, callback, threshold) {
-  if (!('IntersectionObserver' in window)) { callback(); return; }
-  var observer = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (!entry.isIntersecting) return;
-      callback();
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: threshold || 0.25 });
-  observer.observe(element);
-}
-
-var SVGNS = 'http://www.w3.org/2000/svg';
-
-function svgEl(name, attrs) {
-  var node = document.createElementNS(SVGNS, name);
-  Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
-  return node;
-}
-
-function svgText(x, y, text, cls, extra) {
-  var node = svgEl('text', Object.assign({ x: x, y: y, class: cls || 'ax-svg-tick' }, extra || {}));
-  node.textContent = text;
-  return node;
-}
-
-function makeTooltip(host) {
-  var tip = document.createElement('div');
-  tip.className = 'ax-tip';
-  host.appendChild(tip);
-  return {
-    show: function (event, html) {
-      tip.innerHTML = html;
-      tip.classList.add('is-on');
-      var box = host.getBoundingClientRect();
-      tip.style.left = Math.min(Math.max(event.clientX - box.left + 14, 4), box.width - tip.offsetWidth - 4) + 'px';
-      tip.style.top = Math.max(event.clientY - box.top - tip.offsetHeight - 12, 4) + 'px';
-    },
-    hide: function () { tip.classList.remove('is-on'); }
-  };
-}
-
-function signed(v, digits) {
-  return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(digits);
-}
-
-/* ------------------------------------------------------------------
-   Sticky nav, counters, tabs, lightbox
-   ------------------------------------------------------------------ */
-function setupNav() {
-  var nav = document.getElementById('ai-nav');
-  var progress = document.getElementById('ai-progress');
-  var toggle = document.getElementById('ai-nav-toggle');
-  var links = document.getElementById('ai-nav-links');
-  if (!nav) return;
-
+  /* ---- nav: mobile toggle, scroll progress, active section ---- */
+  var toggle = $('nav-toggle'), links = $('nav-links'), progress = $('nav-progress');
   if (toggle && links) {
     toggle.addEventListener('click', function () {
-      var open = links.classList.toggle('is-open');
-      toggle.setAttribute('aria-expanded', String(open));
+      var open = links.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-    links.addEventListener('click', function (event) {
-      if (event.target.tagName === 'A') {
-        links.classList.remove('is-open');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
+    links.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') { links.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); }
     });
   }
-
-  var anchors = links ? Array.prototype.slice.call(links.querySelectorAll('a')) : [];
-  var sections = anchors.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
-
+  var anchors = links ? all('a[href^="#"]', links) : [];
+  var sections = anchors.map(function (a) { return document.querySelector(a.getAttribute('href')); });
   function onScroll() {
-    if (progress) {
-      var height = document.documentElement.scrollHeight - window.innerHeight;
-      progress.style.width = (height > 0 ? (window.pageYOffset / height) * 100 : 0) + '%';
-    }
-    var scrollButton = document.querySelector('.scroll-to-top');
-    if (scrollButton) scrollButton.classList.toggle('visible', window.pageYOffset > 300);
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    if (progress) progress.style.width = (h > 0 ? (window.pageYOffset / h) * 100 : 0) + '%';
     var current = -1;
-    for (var i = 0; i < sections.length; i++) {
-      if (sections[i].getBoundingClientRect().top <= nav.offsetHeight + 20) current = i;
-    }
-    anchors.forEach(function (a, i) { a.classList.toggle('is-active', i === current); });
+    sections.forEach(function (s, i) { if (s && s.getBoundingClientRect().top < 120) current = i; });
+    anchors.forEach(function (a, i) { a.classList.toggle('active', i === current); });
   }
-
-  var ticking = false;
-  window.addEventListener('scroll', function () {
-    if (ticking) return;
-    ticking = true;
-    window.requestAnimationFrame(function () { onScroll(); ticking = false; });
-  }, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-}
 
-function setupCounters() {
-  var counters = document.querySelectorAll('[data-count-to]');
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  function render(el, value) {
-    var decimals = parseInt(el.dataset.decimals || '0', 10);
-    el.textContent = (el.dataset.prefix || '') + value.toFixed(decimals) + (el.dataset.suffix || '');
-  }
-
-  counters.forEach(function (el) {
-    var target = parseFloat(el.dataset.countTo);
-    if (reduce || !('IntersectionObserver' in window)) { render(el, target); return; }
-    onFirstView(el, function () {
-      var start = null;
-      function step(timestamp) {
-        if (start === null) start = timestamp;
-        var p = Math.min((timestamp - start) / 1100, 1);
-        render(el, target * (1 - Math.pow(1 - p, 3)));
-        if (p < 1) window.requestAnimationFrame(step);
-      }
-      window.requestAnimationFrame(step);
-    }, 0.4);
-  });
-}
-
-function setupTabs() {
-  var tabs = document.querySelectorAll('.ai-tab[data-tab]');
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      tabs.forEach(function (t) {
-        var active = t === tab;
-        t.classList.toggle('is-active', active);
-        t.setAttribute('aria-selected', String(active));
-      });
-      document.querySelectorAll('.ai-tab-panel').forEach(function (panel) {
-        panel.classList.toggle('is-active', panel.dataset.panel === tab.dataset.tab);
+  /* ---- sortable tables ---- */
+  all('table.sortable').forEach(function (table) {
+    var tbody = table.tBodies[0];
+    var headers = Array.prototype.slice.call(table.tHead.rows[table.tHead.rows.length - 1].cells);
+    headers.forEach(function (th, col) {
+      var type = th.getAttribute('data-sort');
+      if (!type) return;
+      th.addEventListener('click', function () {
+        var dir = th.classList.contains('desc') ? 'asc' : 'desc';
+        headers.forEach(function (h) { h.classList.remove('asc', 'desc'); });
+        th.classList.add(dir);
+        var rows = Array.prototype.slice.call(tbody.rows);
+        rows.sort(function (a, b) {
+          var x = a.cells[col].textContent.trim(), y = b.cells[col].textContent.trim();
+          var nx = parseFloat(x), ny = parseFloat(y);
+          var cmp = type === 'num' ? (isNaN(nx) ? -1e9 : nx) - (isNaN(ny) ? -1e9 : ny) : x.localeCompare(y);
+          return dir === 'asc' ? cmp : -cmp;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
       });
     });
   });
-}
 
-function setupLightbox() {
-  var lightbox = document.getElementById('ai-lightbox');
-  var image = document.getElementById('ai-lightbox-img');
-  var caption = document.getElementById('ai-lightbox-caption');
-  var closeBtn = document.getElementById('ai-lightbox-close');
-  if (!lightbox || !image) return;
-
-  function open(source) {
-    image.src = source.src;
-    image.alt = source.alt;
-    var figcaption = source.closest('figure') ? source.closest('figure').querySelector('figcaption') : null;
-    if (caption) caption.textContent = figcaption ? figcaption.textContent.trim() : source.alt;
-    lightbox.classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function close() {
-    lightbox.classList.remove('is-open');
-    document.body.style.overflow = '';
-    image.src = '';
-  }
-
-  document.querySelectorAll('.ai-zoomable').forEach(function (img) {
-    img.addEventListener('click', function () { open(img); });
-  });
-  if (closeBtn) closeBtn.addEventListener('click', close);
-  lightbox.addEventListener('click', function (event) { if (event.target === lightbox) close(); });
-  document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && lightbox.classList.contains('is-open')) close();
-  });
-}
-
-/* ------------------------------------------------------------------
-   Pipeline walkthrough
-   ------------------------------------------------------------------ */
-var STAGES = {
-  propose: {
-    eyebrow: 'Component B',
-    title: 'The typed intent',
-    lead: 'A typed intent names what to interact with; every reported run takes it from the task definition.',
-    body: 'The intent names the target, the interaction, the functional region, plan constraints and the next ' +
-      'action. In the reported runs the task definition supplies it and a category prior names the functional ' +
-      'region. A frozen language model can write the same intent from the instruction: a strict parser accepts ' +
-      'exactly one well-formed object and never repairs it.',
-    spec: [['Reported source', 'task definition'], ['Functional region', 'category prior'], ['Proposer backbone', 'gemini-3.8-flash'], ['Parser repairs', 'none']]
-  },
-  candidates: {
-    eyebrow: 'Component A · fixed',
-    title: 'Candidate interactions',
-    lead: 'K top-down grasp candidates, generated once per scene and shared by every method.',
-    body: 'Candidate sets are content-hashed, so a comparison between methods is a comparison of selections from ' +
-      'the same set. In every reported run candidates are sampled on the object’s simulator geometry with a declared ' +
-      'stability score; a detector path (SAM3 with a grasp detector) is implemented as an alternative source.',
-    spec: [['Meta-World K', 'up to 16'], ['LIBERO-PRO K', 'up to 12'], ['Candidate source', 'simulator geometry'], ['Shared across methods', 'yes, hashed']]
-  },
-  ground: {
-    eyebrow: 'Components C to E',
-    title: 'Ground affordance',
-    lead: 'Every candidate gets a feasibility, a functional-part and a task-compatibility score.',
-    body: 'Feasibility multiplies reach, approach and clearance for the embodiment. The functional term scores ' +
-      'distance to the named part, whose points come from a geometric partition of the object. The task term ' +
-      'compiles the next action into constraints on which part stays clear and which face needs room.',
-    spec: [['Feasibility', 'r · a · c'], ['Part points', 'geometric partition'], ['Task term', 'from the next action'], ['Trainable parameters', '0']]
-  },
-  arbitrate: {
-    eyebrow: 'Component F · ours',
-    title: 'Gate, shortlist, arbitrate',
-    lead: 'Feasibility decides what can be done, affordance narrows it to two, and a frozen VLM picks one from the image.',
-    body: 'The gate keeps candidates with r · a · c ≥ 0.5. The two gated candidates with the highest affordance ' +
-      'score form the shortlist, and a frozen VLM, shown the camera image with the candidates marked, chooses between ' +
-      'them. When no candidate passes the gate, the VLM chooses among all candidates. The shortlist size and the ' +
-      'input were fixed on development scenes before the held-out test.',
-    spec: [['Gate', 'r · a · c ≥ 0.5'], ['Shortlist', 'top 2 by affordance'], ['Arbiter', 'Gemini 3.8 Flash, RGB'], ['Trainable parameters', '0']]
-  },
-  execute: {
-    eyebrow: 'Component G · ours',
-    title: 'Execute, verify, replan',
-    lead: 'The executor acts, a frozen verifier checks the result, and an unverified attempt triggers a replan.',
-    body: 'A scripted executor carries out the choice: a 4-DoF Sawyer on Meta-World and an operational-space Franka on ' +
-      'LIBERO-PRO. The arm then moves back and a frozen VLM compares before and after images from both benchmark ' +
-      'cameras. If it does not confirm success, AFFORD-X observes the new state, removes the tried interaction ' +
-      'point, tells the arbiter what went wrong and chooses again, up to three attempts.',
-    spec: [['Verifier', 'Gemini 3.8 Flash'], ['Attempts', 'up to 3'], ['Meta-World', 'one 500-step episode'], ['Success check', 'benchmark native']]
-  }
-};
-
-function setupStages() {
-  var buttons = document.querySelectorAll('.ai-stage');
-  var detail = document.getElementById('ai-loop-detail');
-  if (!buttons.length || !detail) return;
-  var el = {
-    eyebrow: detail.querySelector('.ai-loop-eyebrow'), title: detail.querySelector('h3'),
-    lead: detail.querySelector('.ai-loop-lead'), body: detail.querySelector('.ai-loop-body'),
-    spec: detail.querySelector('.ai-loop-spec')
-  };
-
-  function show(key, button) {
-    var stage = STAGES[key];
-    if (!stage) return;
-    buttons.forEach(function (b) {
-      var active = b === button;
-      b.classList.toggle('is-active', active);
-      b.setAttribute('aria-selected', String(active));
-    });
-    detail.style.setProperty('--stage-c', button.style.getPropertyValue('--stage-c'));
-    el.eyebrow.textContent = stage.eyebrow;
-    el.title.textContent = stage.title;
-    el.lead.textContent = stage.lead;
-    el.body.textContent = stage.body;
-    el.spec.innerHTML = stage.spec.map(function (pair) {
-      return '<div><span class="ai-spec-label">' + pair[0] + '</span><span class="ai-spec-val">' + pair[1] + '</span></div>';
-    }).join('');
-  }
-
-  buttons.forEach(function (button) {
-    button.addEventListener('click', function () { show(button.dataset.stage, button); });
-  });
-  show('propose', buttons[0]);
-}
-
-/* ------------------------------------------------------------------
-   Replay explorer: logged candidates, precomputed selections
-   ------------------------------------------------------------------ */
-var PART_COLORS = { handle: '#E69F00', head: '#56B4E9' };
-
-function setupExplorer() {
-  var data = window.AFFORDX;
-  var host = document.getElementById('ax-cands');
-  if (!host || !data) return;
-  var ex = data.explorer;
-  var state = { part: 'sam3', combine: 'product', gate: true, fn: true, task: true };
-  var scene = document.getElementById('ax-scene');
-  var image = document.getElementById('ax-scene-img');
-  var note = document.getElementById('ax-scene-note');
-  var verdict = document.getElementById('ax-verdict');
-
-  var svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
-  scene.appendChild(svg);
-
-  function key() {
-    return [state.part, state.gate ? 'on' : 'off', state.combine, state.fn ? 1 : 0, state.task ? 1 : 0].join('|');
-  }
-
-  function render() {
-    var sel = ex.selections[key()];
-    var chosen = sel.index;
-    image.src = state.part === 'sam3' && state.fn ? 'static/images/explorer_scene_masks.png' : 'static/images/explorer_scene.png';
-
-    svg.innerHTML = '';
-    ex.candidates.forEach(function (c) {
-      var isSel = c.id === chosen;
-      if (isSel) svg.appendChild(svgEl('circle', { cx: c.u * 100, cy: c.v * 100, r: 3.1, fill: 'none', stroke: '#111', 'stroke-width': 0.7, 'vector-effect': 'non-scaling-stroke' }));
-      svg.appendChild(svgEl('circle', {
-        cx: c.u * 100, cy: c.v * 100, r: isSel ? 1.9 : 1.3, fill: PART_COLORS[c.part] || '#fff',
-        stroke: '#111', 'stroke-width': 0.35, opacity: sel.gated[c.id] ? 0.35 : 1
-      }));
-    });
-    note.textContent = ex.instruction + ' Orange: handle candidates. Blue: head candidates.';
-
-    host.innerHTML = ex.candidates.map(function (c) {
-      var isSel = c.id === chosen;
-      var gated = sel.gated[c.id];
-      var tag = isSel ? '<span class="ax-cand-tag">executed</span>' : (gated ? '<span class="ax-cand-tag is-gate">gated</span>' : '');
-      var outcome = '<span class="ax-cand-out ' + (c.success ? 'is-success' : 'is-fail') + '">' +
-        (c.success ? '✓' : '✗') + '</span>';
-      return '<div class="ax-cand' + (gated ? ' is-gated' : '') + (isSel ? ' is-winner' : '') + '">' +
-        '<span class="ax-cand-id">' + c.id + '</span>' +
-        '<span class="ax-cand-name">' + c.part + tag + '<span>r·a·c ' +
-          (c.terms.reachable * c.terms.approach * c.terms.collision).toFixed(2) + ' · f ' +
-          (state.part === 'sam3' ? c.terms.functional : c.terms.functional_geometry).toFixed(2) +
-          ' · t ' + c.terms.task.toFixed(2) + ' · s ' + c.terms.stability.toFixed(2) + '</span></span>' +
-        '<span class="ax-cand-bar"><span class="ax-cand-fill" style="width:' + (sel.scores[c.id] * 100).toFixed(1) + '%"></span></span>' +
-        '<span class="ax-cand-val">' + outcome + '</span></div>';
-    }).join('');
-
-    if (chosen === null || chosen === undefined) {
-      verdict.innerHTML = '<b>No candidate passes the gate.</b> The rule abstains.';
-      return;
-    }
-    var c = ex.candidates[chosen];
-    verdict.innerHTML = 'Executed: <b>candidate ' + chosen + ', ' + c.part + '</b> &middot; simulator outcome: <b class="' +
-      (c.success ? 'ax-good' : 'ax-bad') + '">' + (c.success ? 'success' : 'failure') + '</b><br>' +
-      ex.n_success + ' of ' + ex.candidates.length + ' candidates succeed in this scene. Stability ranking (L0) executes candidate ' +
-      ex.l0_index + ', a ' + ex.candidates[ex.l0_index].part + ' grasp that ' +
-      (ex.candidates[ex.l0_index].success ? 'succeeds.' : 'fails.');
-  }
-
-  document.querySelectorAll('.ax-pill[data-part]').forEach(function (pill) {
-    pill.addEventListener('click', function () {
-      state.part = pill.dataset.part;
-      document.querySelectorAll('.ax-pill[data-part]').forEach(function (p) { p.classList.toggle('is-active', p === pill); });
-      render();
-    });
-  });
-  document.querySelectorAll('.ax-pill[data-combine]').forEach(function (pill) {
-    pill.addEventListener('click', function () {
-      state.combine = pill.dataset.combine;
-      document.querySelectorAll('.ax-pill[data-combine]').forEach(function (p) { p.classList.toggle('is-active', p === pill); });
-      render();
-    });
-  });
-  document.querySelectorAll('.ax-toggle[data-flag]').forEach(function (button) {
-    button.addEventListener('click', function () {
-      var flag = button.dataset.flag;
-      state[flag] = !state[flag];
-      button.classList.toggle('is-on', state[flag]);
-      button.setAttribute('aria-pressed', String(state[flag]));
-      render();
-    });
-  });
-  render();
-}
-
-/* ------------------------------------------------------------------
-   Success-rate charts with Wilson intervals
-   ------------------------------------------------------------------ */
-var HIGHLIGHT = {
-  L3_feasibility_first: '#6A3FB5', affordx_L3: '#8E6BCF', affordx_single: '#8E6BCF', method_single: '#8E6BCF',
-  method: '#6A3FB5', method_loop: '#6A3FB5',
-  random: '#37404D', oracle: '#C9CDD4',
-  L2_feasibility_first_geomparts: '#1F7A6E', L3_feasibility_first_geomparts: '#1F7A6E'
-};
-
-function drawRates(host, block) {
-  var rows = block.methods;
-  var W = 680, ML = 190, MR = 70, MT = 14, RH = 27, MB = 34;
-  var H = MT + rows.length * RH + MB;
-  var tip = host._tip || (host._tip = makeTooltip(host));
-  function xAt(v) { return ML + v * (W - ML - MR); }
-
-  var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
-  svg.setAttribute('aria-label', 'Success rate by method with 95% intervals, ' + block.experiment);
-  [0, 0.25, 0.5, 0.75, 1].forEach(function (v) {
-    svg.appendChild(svgEl('line', { x1: xAt(v), x2: xAt(v), y1: MT - 4, y2: H - MB + 4, class: v === 0 ? 'ax-svg-axis' : 'ax-svg-grid' }));
-    svg.appendChild(svgText(xAt(v), H - MB + 20, v.toFixed(2), 'ax-svg-tick', { 'text-anchor': 'middle' }));
-  });
-  rows.forEach(function (row, i) {
-    var y = MT + i * RH;
-    var color = HIGHLIGHT[row.key] || '#9AA3B2';
-    svg.appendChild(svgText(ML - 12, y + RH / 2 + 4, row.label, row.key in HIGHLIGHT && row.key !== 'oracle' ? 'ax-svg-label' : 'ax-svg-tick', { 'text-anchor': 'end' }));
-    var bar = svgEl('rect', { x: xAt(0), y: y + 5, width: Math.max(xAt(row.rate) - xAt(0), 1.5), height: RH - 10, rx: 3, fill: color, class: 'ax-point' });
-    svg.appendChild(bar);
-    svg.appendChild(svgEl('line', { x1: xAt(row.lo), x2: xAt(row.hi), y1: y + RH / 2, y2: y + RH / 2, stroke: '#1f2430', 'stroke-width': 1.3 }));
-    [row.lo, row.hi].forEach(function (b) {
-      svg.appendChild(svgEl('line', { x1: xAt(b), x2: xAt(b), y1: y + RH / 2 - 4, y2: y + RH / 2 + 4, stroke: '#1f2430', 'stroke-width': 1.3 }));
-    });
-    svg.appendChild(svgText(W - MR + 10, y + RH / 2 + 4, row.rate.toFixed(2), 'ax-svg-label'));
-    bar.addEventListener('mousemove', function (event) {
-      tip.show(event, '<b>' + row.label + '</b><br>' + row.rate.toFixed(3) + '<br>95% CI [' + row.lo.toFixed(3) + ', ' + row.hi.toFixed(3) + ']<br>n = ' + row.n);
-    });
-    bar.addEventListener('mouseleave', tip.hide);
-  });
-  svg.appendChild(svgText(ML + (W - ML - MR) / 2, H - 4, 'task success', 'ax-svg-label', { 'text-anchor': 'middle' }));
-  host.querySelectorAll('svg').forEach(function (old) { old.remove(); });
-  host.appendChild(svg);
-}
-
-function drawPairs(host, block, wanted) {
-  if (!host) return;
-  host.innerHTML = wanted.map(function (w) {
-    var p = block.paired[w[0]];
-    if (!p) return '';
-    var excludes = p.lo > 0 || p.hi < 0;
-    return '<div class="ax-pair' + (excludes ? ' is-clear' : '') + '"><span>' + w[1] + '</span><b>' + signed(p.d, 3) +
-      '</b><em>[' + signed(p.lo, 3) + ', ' + signed(p.hi, 3) + ']</em></div>';
-  }).join('');
-}
-
-function setupRateSection(hostId, pairsId, attr, blocks, wanted) {
-  var host = document.getElementById(hostId);
-  if (!host || !blocks) return;
-  var pairs = document.getElementById(pairsId);
-  function show(name) {
-    drawRates(host, blocks[name]);
-    drawPairs(pairs, blocks[name], wanted);
-  }
-  var pills = document.querySelectorAll('.ax-pill[data-' + attr + ']');
-  pills.forEach(function (pill) {
-    pill.setAttribute('aria-pressed', String(pill.classList.contains('is-active')));
-    pill.addEventListener('click', function () {
-      if (!blocks[pill.dataset[attr]]) return;
-      pills.forEach(function (p) {
-        p.classList.toggle('is-active', p === pill);
-        p.setAttribute('aria-pressed', String(p === pill));
+  /* ---- heat tables: <table class="heat" data-max="1" data-group="5"> ---- */
+  all('table.heat').forEach(function (table) {
+    var max = parseFloat(table.getAttribute('data-max') || '1');
+    var group = parseInt(table.getAttribute('data-group') || '0', 10);
+    Array.prototype.forEach.call(table.tBodies[0].rows, function (row) {
+      all('td:not(.col-avg)', row).forEach(function (td, i) {
+        var v = parseFloat(td.textContent);
+        if (!isNaN(v)) {
+          var h = Math.max(0, Math.min(1, v / max));
+          td.style.setProperty('--h', h.toFixed(3));
+          if (h >= 0.75) td.classList.add('light-text');
+        }
+        if (group && i % group === group - 1) td.classList.add('gsep');
       });
-      show(pill.dataset[attr]);
     });
   });
-  show(pills.length ? pills[0].dataset[attr] : Object.keys(blocks)[0]);
-}
 
-function rateOf(block, key) {
-  var row = block.methods.filter(function (m) { return m.key === key; })[0];
-  return row ? row.rate.toFixed(2) : '–';
-}
-
-function renderLiberoTable(data) {
-  var body = document.getElementById('ax-libero-table');
-  if (!body || !data.libero_pro) return;
-  var cols = ['goal_pos', 'goal_task', 'spatial_pos', 'spatial_task', 'object_pos', 'object_task'];
-  var rows = [['L3_feasibility_first', 'AFFORD-X affordance layer'], ['random', 'random choice'], ['oracle', 'best-candidate ceiling']];
-  var html = rows.map(function (r) {
-    return '<tr' + (r[0] === 'L3_feasibility_first' ? ' class="ax-row-ours"' : '') + '><th scope="row" class="ai-th-text">' + r[1] + '</th>' +
-      cols.map(function (c) { return '<td>' + rateOf(data.libero_pro[c], r[0]) + '</td>'; }).join('') + '</tr>';
-  }).join('');
-  html += '<tr><th scope="row" class="ai-th-text">tasks evaluated</th>' + cols.map(function (c) {
-    return '<td>' + data.libero_pro[c].tasks_covered + '</td>';
-  }).join('') + '</tr>';
-  body.innerHTML = html;
-  var integrity = document.getElementById('ax-libero-integrity');
-  if (integrity && data.libero_pro_integrity) {
-    var g = data.libero_pro_integrity;
-    integrity.textContent = g.n_outcome_mismatch + ' of ' + g.n_videos.toLocaleString('en-US') +
-      ' recorded rollouts disagree with their unrecorded simulator outcome, and ' + g.determinism_inexact + ' of ' +
-      g.determinism_checks + ' rerun checks differ.';
-  }
-}
-
-function renderTierTable(data) {
-  var body = document.getElementById('ax-mt50-table');
-  if (!body || !data.metaworld || !data.metaworld.mt50) return;
-  var mt = data.metaworld.mt50;
-  var tiers = ['easy', 'medium', 'hard', 'very_hard', 'overall'];
-  var rows = [['L3_feasibility_first', 'AFFORD-X affordance layer'], ['L0_stability', 'L0 stability'], ['random', 'random choice'],
-    ['oracle', 'best-candidate ceiling']];
-  body.innerHTML = rows.map(function (r) {
-    return '<tr' + (r[0] === 'L3_feasibility_first' ? ' class="ax-row-ours"' : '') + '><th scope="row" class="ai-th-text">' + r[1] + '</th>' +
-      tiers.map(function (t) { return '<td>' + mt.by_tier[r[0]][t].rate.toFixed(2) + '</td>'; }).join('') + '</tr>';
-  }).join('');
-  var head = document.getElementById('ax-mt50-head');
-  if (head) {
-    var names = { easy: 'Easy', medium: 'Medium', hard: 'Hard', very_hard: 'Very hard', overall: 'All' };
-    head.innerHTML = '<th class="ai-th-text" scope="col">Method</th>' + tiers.map(function (t) {
-      return '<th scope="col">' + names[t] + ' (' + mt.by_tier.oracle[t].n_tasks + ')</th>';
-    }).join('');
-  }
-}
-
-function setupResults() {
-  var data = window.AFFORDX;
-  if (!data) return;
-  setupRateSection('ax-libero', 'ax-libero-pairs', 'libero', data.libero_pro, [
-    ['L3_feasibility_first|random|success', 'feasibility-first + task (L3) minus random']
-  ]);
-  setupRateSection('ax-mw', null, 'mw', data.metaworld, []);
-  renderLiberoTable(data);
-  renderTierTable(data);
-  if (data.arbitration) {
-    setupRateSection('ax-arb', 'ax-arb-pairs', 'arb', data.arbitration, [
-      ['method|gemini_direct|success', 'arbitration minus VLM alone'],
-      ['method|random_shortlist|success', 'arbitration minus random in the shortlist']
-    ]);
-    renderArbitrationCards(data.arbitration);
-  }
-  if (data.agentic_loop) {
-    setupRateSection('ax-loop', 'ax-loop-pairs', 'loop', data.agentic_loop, [
-      ['method_loop|affordx_single|success', 'agentic loop minus affordance layer, 1 attempt'],
-      ['method_loop|method_single|success', 'agentic loop minus arbitration, 1 attempt']
-    ]);
-    renderVerifier(data.agentic_loop);
-  }
-  renderRecoveries(data.recoveries || []);
-  renderPairCaptions(data.videos || {});
-}
-
-function renderPairCaptions(videos) {
-  document.querySelectorAll('figcaption[data-video]').forEach(function (cap) {
-    var v = videos[cap.dataset.video];
-    if (!v) return;
-    var badge = v.success ? '<span class="ax-outcome is-success"><i class="fas fa-check"></i> succeeds</span> '
-      : '<span class="ax-outcome is-fail"><i class="fas fa-times"></i> fails</span> ';
-    var label = escapeHtml(cap.dataset.label);
-    cap.innerHTML = badge + label + (v.method === 'L0_stability' ? '.' : ', ' + escapeHtml(v.where) + '.');
-  });
-}
-
-function bracket(p) {
-  return '[' + signed(p.lo, 3) + ', ' + signed(p.hi, 3) + ']';
-}
-
-function interval(p) {
-  return signed(p.d, 3) + ' ' + bracket(p);
-}
-
-function setText(id, text) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
-
-function renderArbitrationCards(arb) {
-  var all = arb.all.paired, lib = arb.libero_pro.paired;
-  var direct = all['method|gemini_direct|success'], shortlist = all['method|random_shortlist|success'];
-  setText('ax-arb-h1', signed(direct.d, 3) + ' over the same VLM alone');
-  setText('ax-arb-p1', 'Choosing within the affordance shortlist instead of among all candidates raises success on ' +
-    arb.all.n_scenes + ' unseen scenes, ' + bracket(direct) + '; on LIBERO-PRO ' +
-    interval(lib['method|gemini_direct|success']) + '.');
-  setText('ax-arb-h2', signed(shortlist.d, 3) + ' over random in the shortlist');
-  setText('ax-arb-p2', 'Given the same two candidates, the VLM picks one that succeeds more often than chance, ' +
-    bracket(shortlist) + '; on LIBERO-PRO ' + interval(lib['method|random_shortlist|success']) + '.');
-  setText('ax-arb-h3', 'Shortlist of ' + arb.rule.shortlist + ', ' + arb.rule.input.toUpperCase() + ' input');
-  setText('ax-arb-p3', 'Selected by a rule declared before any held-out call, from ' + arb.rule.dev_success.toFixed(3) +
-    ' success on the development scenes, then applied once to the held-out scenes.');
-}
-
-function renderVerifier(loop) {
-  var lib = loop.libero_pro, mt = loop.mt50;
-  setText('ax-loop-verifier', 'Verifier against the benchmark\u2019s own check: on LIBERO-PRO it called ' +
-    lib.verifier.failed_called_success + ' of ' + lib.verifier.failed_attempts + ' failed attempts a success, on ' +
-    'Meta-World ' + mt.verifier.failed_called_success + ' of ' + mt.verifier.failed_attempts + '. AFFORD-X used ' +
-    lib.mean_attempts.toFixed(2) + ' attempts per LIBERO-PRO episode and ' + mt.mean_attempts.toFixed(2) +
-    ' per Meta-World episode, and the first attempt reproduced the stored single-shot outcome in every episode (' +
-    (lib.attempt1_replay_mismatches + mt.attempt1_replay_mismatches) + ' mismatches).');
-}
-
-function renderRecoveries(items) {
-  var host = document.getElementById('ax-recoveries');
-  if (!host) return;
-  host.innerHTML = items.map(function (r) {
-    var steps = r.attempts.map(function (a, i) {
-      return '<li><b>Attempt ' + (i + 1) + '</b> ' + (a.verifier_success ? 'verified' : 'not verified') +
-        ': \u201c' + escapeHtml(a.verifier_reason || '') + '\u201d</li>';
-    }).join('');
-    return '<figure class="ax-video"><video src="' + r.video + '" poster="' + r.poster +
-      '" muted loop playsinline controls preload="metadata"></video><figcaption><span class="ax-outcome is-success">' +
-      '<i class="fas fa-check"></i> recovered</span> ' + escapeHtml(r.instruction) + ' <span class="ax-muted">' +
-      escapeHtml(r.cell.replace(/_/g, ' ')) + ', ' + escapeHtml(r.scene) + '</span><ol class="ax-attempts">' + steps +
-      '</ol></figcaption></figure>';
-  }).join('');
-}
-
-/* ------------------------------------------------------------------
-   Rollout gallery, video handling, keyboard support, failure isolation
-   ------------------------------------------------------------------ */
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-  });
-}
-
-function prefersReducedMotion() {
-  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-}
-
-function playQuietly(video) {
-  var promise = video.play();
-  if (promise && promise.catch) promise.catch(function () { /* autoplay can be refused; controls stay available */ });
-}
-
-function showVideoFallback(video) {
-  var holder = video.closest('figure') || video.parentNode;
-  if (!holder || holder.querySelector('.ax-video-fallback:not([hidden])')) return;
-  var src = video.currentSrc || video.getAttribute('src') || '';
-  var note = document.createElement('p');
-  note.className = 'ax-video-fallback';
-  note.innerHTML = 'This rollout could not be played in your browser. ' +
-    (src ? '<a href="' + escapeHtml(src) + '">Download the MP4</a>.' : '');
-  holder.insertBefore(note, video.nextSibling);
-}
-
-function setupVideos() {
-  var videos = Array.prototype.slice.call(document.querySelectorAll('video'));
-  if (!videos.length) return;
-  var info = (window.AFFORDX && window.AFFORDX.videos) || {};
-  var reduce = prefersReducedMotion();
-  videos.forEach(function (video) {
-    video.muted = true;
-    var name = (video.getAttribute('src') || '').split('/').pop();
-    if (info[name] && info[name].poster && !video.getAttribute('poster')) video.setAttribute('poster', info[name].poster);
-    video.addEventListener('error', function () { showVideoFallback(video); });
-    if (reduce) {
-      video.removeAttribute('autoplay');
-      video.autoplay = false;
-      video.controls = true;
-      video.pause();
+  /* ---- segmented controls: <div class="segctl" data-src="json-id" data-out="panel-id"> ---- */
+  all('.segctl[data-src]').forEach(function (seg) {
+    var data = JSON.parse($(seg.getAttribute('data-src')).textContent);
+    var out = $(seg.getAttribute('data-out'));
+    var buttons = all('button', seg);
+    function show(key) {
+      var d = data[key];
+      buttons.forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-key') === key); });
+      all('[data-field]', out).forEach(function (el) {
+        var v = d[el.getAttribute('data-field')];
+        el.textContent = v === undefined ? '' : v;
+      });
+      all('[data-bar]', out).forEach(function (el) {
+        var v = parseFloat(d[el.getAttribute('data-bar')]);
+        var scale = parseFloat(el.getAttribute('data-scale') || '100');
+        el.style.width = (isNaN(v) ? 0 : Math.min(100, v / scale * 100)) + '%';
+      });
     }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-key')); }); });
+    show((buttons.filter(function (b) { return b.classList.contains('on'); })[0] || buttons[0]).getAttribute('data-key'));
   });
-  if (reduce || !('IntersectionObserver' in window)) return;
-  var observer = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (entry.isIntersecting && entry.target.getAttribute('src')) playQuietly(entry.target);
-      else entry.target.pause();
+
+  /* ---- lightbox ---- */
+  var lb = $('lightbox'), lbImg = $('lightbox-img');
+  function closeLb() { lb.classList.remove('open'); lbImg.src = ''; }
+  if (lb) {
+    all('img.zoom').forEach(function (img) {
+      img.addEventListener('click', function () { lbImg.src = img.src; lbImg.alt = img.alt; lb.classList.add('open'); });
     });
-  }, { threshold: 0.25 });
-  videos.forEach(function (video) {
-    video.removeAttribute('autoplay');
-    observer.observe(video);
-  });
-}
+    lb.addEventListener('click', closeLb);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLb(); });
+  }
 
-function setupGallery() {
-  var data = window.AFFORDX;
-  var root = document.getElementById('ax-gallery');
-  if (!root || !data || !data.gallery || !data.gallery.length) return;
-  var items = data.gallery;
-  var pillHost = document.getElementById('ax-gallery-pills');
-  var video = document.getElementById('ax-gallery-video');
-  var caption = document.getElementById('ax-gallery-caption');
-  var fallback = document.getElementById('ax-gallery-fallback');
-  var groups = [];
-  var byGroup = {};
-  items.forEach(function (item, i) {
-    if (!byGroup[item.group]) { byGroup[item.group] = []; groups.push(item.group); }
-    byGroup[item.group].push(i);
-  });
-  pillHost.innerHTML = groups.map(function (group) {
-    return '<div class="ax-gallery-group"><span class="ax-gallery-group-name">' + escapeHtml(group) + '</span>' +
-      '<div class="ax-pills ax-pills-left" role="group" aria-label="' + escapeHtml(group) + ' rollouts">' +
-      byGroup[group].map(function (i) {
-        return '<button class="ax-pill" type="button" data-gallery="' + i + '" aria-pressed="false">' +
-          escapeHtml(items[i].label) + '</button>';
-      }).join('') + '</div></div>';
-  }).join('');
-  var buttons = Array.prototype.slice.call(pillHost.querySelectorAll('[data-gallery]'));
-  var current = 0;
-
-  function show(index, fromUser) {
-    current = (index + items.length) % items.length;
-    var item = items[current];
-    buttons.forEach(function (b) {
-      var on = Number(b.dataset.gallery) === current;
-      b.classList.toggle('is-active', on);
-      b.setAttribute('aria-pressed', String(on));
+  /* ---- BibTeX copy ---- */
+  var copyBtn = $('copy-bib');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var done = function () {
+        copyBtn.textContent = 'Copied';
+        copyBtn.classList.add('done');
+        setTimeout(function () { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('done'); }, 1800);
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText($('bib-code').textContent).then(done);
     });
-    if (fallback) fallback.hidden = true;
-    var stale = root.querySelectorAll('.ax-video-fallback:not(#ax-gallery-fallback)');
-    Array.prototype.forEach.call(stale, function (node) { node.remove(); });
-    video.setAttribute('poster', item.poster);
-    video.setAttribute('src', item.video);
-    video.setAttribute('aria-label', 'Successful AFFORD-X rollout: ' + item.instruction);
-    caption.innerHTML = '<span class="ax-outcome is-success"><i class="fas fa-check"></i> succeeds</span> <b>' +
-      escapeHtml(item.group + ' · ' + item.label) + '</b> &middot; ' + escapeHtml(item.scene) +
-      (item.instruction ? '<br><em>' + escapeHtml(item.instruction) + '</em>' : '');
-    if (fromUser && !prefersReducedMotion()) playQuietly(video);
   }
-
-  buttons.forEach(function (b) {
-    b.addEventListener('click', function () { show(Number(b.dataset.gallery), true); });
-  });
-  var prev = document.getElementById('ax-gallery-prev');
-  var next = document.getElementById('ax-gallery-next');
-  if (prev) prev.addEventListener('click', function () { show(current - 1, true); });
-  if (next) next.addEventListener('click', function () { show(current + 1, true); });
-  root.addEventListener('keydown', function (event) {
-    if (event.target.closest && event.target.closest('.ax-pills')) return;   // pill groups handle their own arrows
-    if (event.key === 'ArrowRight') { show(current + 1, true); event.preventDefault(); }
-    if (event.key === 'ArrowLeft') { show(current - 1, true); event.preventDefault(); }
-  });
-  show(0, false);
-}
-
-function setupPillKeys() {
-  document.addEventListener('keydown', function (event) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    var pill = event.target.closest && event.target.closest('.ax-pills .ax-pill');
-    if (!pill) return;
-    var group = Array.prototype.slice.call(pill.parentNode.querySelectorAll('.ax-pill'));
-    var step = event.key === 'ArrowRight' ? 1 : -1;
-    var target = group[(group.indexOf(pill) + step + group.length) % group.length];
-    target.focus();
-    target.click();
-    event.preventDefault();
-  });
-}
-
-function setupDataNotice() {
-  if (window.AFFORDX) return;
-  ['ax-libero', 'ax-mw', 'ax-cands', 'ax-gallery'].forEach(function (id) {
-    var host = document.getElementById(id);
-    if (!host) return;
-    var note = document.createElement('p');
-    note.className = 'ax-data-notice';
-    note.textContent = 'The interactive results could not load (static/js/affordx_data.js is missing). The figures and text remain valid.';
-    host.appendChild(note);
-  });
-}
-
-/* The embedded viewers are same-origin, so each iframe takes the height of its content. */
-function setupEmbeds() {
-  Array.prototype.forEach.call(document.querySelectorAll('.ax-embed iframe'), fitEmbed);
-}
-
-function fitEmbed(frame) {
-  function fit() {
-    try {
-      var doc = frame.contentDocument;
-      /* The body's own height: the document's scroll height never drops below the iframe's current height. */
-      if (doc && doc.body) frame.style.height = Math.ceil(doc.body.getBoundingClientRect().height) + 'px';
-    } catch (err) {
-      /* A cross-origin preview keeps the stylesheet height. */
-    }
-  }
-  frame.addEventListener('load', function () {
-    fit();
-    try {
-      if (window.ResizeObserver && frame.contentDocument) new ResizeObserver(fit).observe(frame.contentDocument.body);
-    } catch (err) {
-      /* A cross-origin preview keeps the stylesheet height. */
-    }
-  });
-}
-
-function safe(name, fn) {
-  try {
-    fn();
-  } catch (err) {
-    if (window.console && console.warn) console.warn('AFFORD-X page: ' + name + ' did not initialise', err);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-  safe('navigation', setupNav);
-  safe('counters', setupCounters);
-  safe('tabs', setupTabs);
-  safe('lightbox', setupLightbox);
-  safe('pipeline stages', setupStages);
-  safe('replay explorer', setupExplorer);
-  safe('results', setupResults);
-  safe('rollout gallery', setupGallery);
-  safe('videos', setupVideos);
-  safe('embedded viewer', setupEmbeds);
-  safe('keyboard', setupPillKeys);
-  safe('data notice', setupDataNotice);
-});
+})();
