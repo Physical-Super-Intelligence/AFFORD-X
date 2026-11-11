@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="static/images/robot.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="static/css/index.css">
   <style>:root { --brand: #0f766e; --violet: #7c3aed; --orange: #f97316; }</style>
   <script defer src="static/js/index.js"></script>
@@ -83,6 +83,9 @@
   <section class="band alt" id="method">
     <div class="wrap">
       <div class="head"><span class="kicker k1">Method</span><h2>Perceive, can, should, act and verify</h2></div>
+      <div class="tabset">
+        <div class="tabbar"><div class="segctl" data-tabs><button type="button" data-tab="loop" class="on">The loop</button><button type="button" data-tab="map">Affordance map vs. AFFORD-X</button></div></div>
+        <div class="tabpanel" data-panel="loop">
       <figure class="fig" style="margin-top:0">
         <img src="static/images/framework.jpg" class="zoom" loading="lazy" width="2400" height="1120"
              alt="The AFFORD-X loop: ground and propose, feasibility gate, affordance ranking, execute and verify">
@@ -93,13 +96,17 @@
           failure the loop re-observes, excludes the failed contact and selects again. All models are frozen; the decision
           rule has no trained parameters.</figcaption>
       </figure>
-      <figure class="fig fig-narrow">
+        </div>
+        <div class="tabpanel" data-panel="map">
+      <figure class="fig fig-narrow" style="margin-top:0">
         <img src="static/images/map_vs_affordx.jpg" class="zoom" loading="lazy" width="2400" height="1538"
              alt="Affordance map versus AFFORD-X on one logged Meta-World scene">
         <figcaption><b>Affordance map vs. AFFORD-X</b> on one logged MT50 scene with 16 candidate contacts. Ranking by
           affordance score alone leaves the puck short of the goal; gating, then ordering by the mechanics key, picks the
           contact behind the puck on its line of push.</figcaption>
       </figure>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -110,7 +117,7 @@
       <p class="pull">From perception alone and on its first attempt, AFFORD-X reaches <b>63.3%</b> mean success:
         3.5&times; CaP-Agent0 (18.2%) and 4.9&times; the strongest fine-tuned VLA, &pi;<sub>0.5</sub> (12.8%).</p>
       <div class="table-wrap">
-        <table class="tbl" id="pro-table">
+        <table class="tbl" id="pro-table" data-chart="8" data-chart-max="100" data-chart-title="Mean success over the six cells (%)">
           <thead>
             <tr class="group"><th rowspan="2">Method</th><th rowspan="2">Venue</th>
               <th colspan="2">Object</th><th colspan="2">Goal</th><th colspan="2">Spatial</th><th rowspan="2" class="col-avg">Mean</th></tr>
@@ -151,7 +158,7 @@
       <p class="pull">The contact-mechanics key raises first-attempt success from 46.7% to <b>54.7%</b>; with verification and
         replanning the loop reaches <b>58.0%</b>, without a single demonstration.</p>
       <div class="table-wrap">
-        <table class="tbl">
+        <table class="tbl" data-chart="6" data-chart-max="100" data-chart-title="MT50 mean success over tiers (%)">
           <thead>
             <tr><th>Method</th><th>Venue</th><th>Easy (28)</th><th>Med. (11)</th><th>Hard (6)</th><th>V.hard (5)</th><th class="col-avg">Mean</th><th>All (150)</th><th>Loop (150)</th></tr>
           </thead>
@@ -206,7 +213,7 @@
       <p class="pull">Grounding the VLM in the affordance shortlist adds 4.5 points, but once the layer orders the contacts the VLM adds
         <b>nothing</b>. AFFORD-X uses the VLM to perceive and verify, and keeps it out of the contact choice.</p>
       <div class="table-wrap">
-        <table class="tbl">
+        <table class="tbl" data-chart="3" data-chart-max="100" data-chart-title="First-attempt success, all 510 scenes (%)">
           <thead><tr><th>Who chooses the contact</th><th>LIBERO-PRO</th><th>MT50</th><th class="col-avg">All</th></tr></thead>
           <tbody>
             <tr><th>VLM, directly from all candidates</th><td>82.8</td><td>45.3</td><td class="col-avg">71.8</td></tr>
